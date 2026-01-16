@@ -42,175 +42,10 @@ const Calculator = () => {
   const [results, setResults] = useState({});
   const [targetAverage, setTargetAverage] = useState('');
 
-  // Auto-save effect
-  useEffect(() => {
-    if (results.average) {
-      const timer = setTimeout(() => {
-        saveToFirebase(results);
-      }, 2000); // 2 second debounce
-      return () => clearTimeout(timer);
-    }
-  }, [results]);
+  // No Auto-save or Auto-calculate effects
 
-  const saveToFirebase = async (currentResults) => {
-    if (!currentResults || !currentResults.average) return;
-
-    try {
-      await db.collection("calculations").add({
-        average: currentResults.average,
-        totalCoef: currentResults.totalCoef,
-        subjects: currentResults.subjects,
-        grades: grades,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      console.log("Auto-save successful");
-    } catch (error) {
-      console.error("Auto-save error", error);
-      // Removed alert to avoid interrupting user
-    }
-  };
-
-  const calculateRequiredGrades = () => {
-    if (!targetAverage || isNaN(targetAverage)) return;
-    const target = parseFloat(targetAverage);
-    let totalCoef = 0;
-    let currentWeightedSum = 0;
-    let coefOfX = 0;
-
-    subjects.forEach(subject => {
-      totalCoef += subject.coef;
-
-      const grade = grades[subject.key];
-      const tdVal = parseFloat(grade.td);
-      const tpVal = parseFloat(grade.tp);
-      const examenVal = parseFloat(grade.examen);
-
-      const isTdFilled = !isNaN(tdVal);
-      const isTpFilled = !isNaN(tpVal);
-      const isExamenFilled = !isNaN(examenVal);
-
-      let count = 0;
-      if (subject.hasTD) count++;
-      if (subject.hasTP) count++;
-
-      let continuPart = 0;
-      let continuXCoef = 0;
-
-      if (count > 0) {
-        if (subject.hasTD) {
-          if (isTdFilled) continuPart += tdVal;
-          else continuXCoef += 1;
-        }
-        if (subject.hasTP) {
-          if (isTpFilled) continuPart += tpVal;
-          else continuXCoef += 1;
-        }
-        continuPart /= count;
-        continuXCoef /= count;
-      }
-
-      let subjectConstant = 0;
-      let subjectXCoef = 0;
-
-      if (subject.hasTD || subject.hasTP) {
-        subjectConstant = 0.4 * continuPart;
-        subjectXCoef = 0.4 * continuXCoef;
-
-        if (isExamenFilled) {
-          subjectConstant += 0.6 * examenVal;
-        } else {
-          subjectXCoef += 0.6;
-        }
-      } else {
-        if (isExamenFilled) {
-          subjectConstant = examenVal;
-        } else {
-          subjectXCoef = 1;
-        }
-      }
-
-      currentWeightedSum += subjectConstant * subject.coef;
-      coefOfX += subjectXCoef * subject.coef;
-    });
-
-    if (coefOfX === 0) {
-      alert("Tous les champs sont déjà remplis ou aucun champ n'est modifiable !");
-      return;
-    }
-
-    let requiredX = (target * totalCoef - currentWeightedSum) / coefOfX;
-    requiredX = parseFloat(requiredX.toFixed(2));
-
-    const newGrades = JSON.parse(JSON.stringify(grades));
-    subjects.forEach(subject => {
-      const gradeKey = subject.key;
-      if (subject.hasTD && newGrades[gradeKey].td === '') newGrades[gradeKey].td = requiredX;
-      if (subject.hasTP && newGrades[gradeKey].tp === '') newGrades[gradeKey].tp = requiredX;
-      if (newGrades[gradeKey].examen === '') newGrades[gradeKey].examen = requiredX;
-    });
-    setGrades(newGrades);
-  };
-
-  const subjects = [
-    {
-      key: 'asd3',
-      name: 'Algorithmique et structure de données 3',
-      coef: 4,
-      hasTD: true,
-      hasTP: true,
-      ue: 'UEF 3.1'
-    },
-    {
-      key: 'poo1',
-      name: 'Programmation orientée objet 1',
-      coef: 4,
-      hasTD: false,
-      hasTP: true,
-      ue: 'UEF 3.1'
-    },
-    {
-      key: 'si',
-      name: "Introduction aux Systèmes d'information",
-      coef: 3,
-      hasTD: true,
-      hasTP: false,
-      ue: 'UEF 3.1'
-    },
-    {
-      key: 'alg3',
-      name: 'Algèbre 3',
-      coef: 3,
-      hasTD: true,
-      hasTP: false,
-      ue: 'UEF 3.2'
-    },
-    {
-      key: 'am3',
-      name: 'Analyse mathématique 3',
-      coef: 3,
-      hasTD: true,
-      hasTP: false,
-      ue: 'UEF 3.2'
-    },
-    {
-      key: 'prob2',
-      name: 'Probabilités et statistiques 2',
-      coef: 2,
-      hasTD: true,
-      hasTP: false,
-      ue: 'UEM 3.1'
-    },
-    {
-      key: 'entrep',
-      name: 'Entreprenariat',
-      coef: 1,
-      hasTD: false,
-      hasTP: false,
-      ue: 'UET 3.1'
-    }
-  ];
-
-  const calculateAverage = () => {
+  // Function to perform calculation and return result object
+  const getCalculatedResults = () => {
     let totalWeightedGrade = 0;
     let totalCoef = 0;
     const subjectResults = {};
@@ -251,16 +86,18 @@ const Calculator = () => {
 
     const average = totalCoef > 0 ? (totalWeightedGrade / totalCoef).toFixed(2) : 0;
 
-    setResults({
+    return {
       subjects: subjectResults,
       average: average,
       totalCoef: totalCoef
-    });
+    };
   };
 
-  useEffect(() => {
-    calculateAverage();
-  }, [grades]);
+  const handleManualCalculate = () => {
+    const newResults = getCalculatedResults();
+    setResults(newResults);
+    saveToFirebase(newResults);
+  };
 
   const handleInputChange = (subject, type, value) => {
     if (value === '' || (parseFloat(value) >= 0 && parseFloat(value) <= 20)) {
@@ -389,8 +226,17 @@ const Calculator = () => {
             ))}
           </div>
 
+          <div className="mt-8 flex justify-center">
+            <button
+              onClick={handleManualCalculate}
+              className="px-8 py-3 bg-indigo-600 text-white text-lg rounded-lg hover:bg-indigo-700 transition-colors shadow-lg font-bold"
+            >
+              Calculer ma Moyenne
+            </button>
+          </div>
+
           {results.average && (
-            <div className="mt-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-6 text-white">
+            <div className="mt-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-6 text-white animate-fade-in">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold">Moyenne Générale</h2>
@@ -408,16 +254,11 @@ const Calculator = () => {
                     : '✗ Non validé - Il faut obtenir au moins 10/20'}
                 </p>
               </div>
-              <div className="mt-6 flex justify-end">
-                <span className="text-xs text-indigo-200 italic">
-                  Sauvegarde automatique...
-                </span>
-              </div>
             </div>
           )}
         </div>
       </div>
-    </div >
+    </div>
   );
 };
 
