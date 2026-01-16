@@ -42,6 +42,16 @@ const Calculator = () => {
   const [results, setResults] = useState({});
   const [targetAverage, setTargetAverage] = useState('');
 
+  // Auto-save effect
+  useEffect(() => {
+    if (results.average) {
+      const timer = setTimeout(() => {
+        saveToFirebase(results);
+      }, 2000); // 2 second debounce
+      return () => clearTimeout(timer);
+    }
+  }, [results]);
+
   const saveToFirebase = async (currentResults) => {
     if (!currentResults || !currentResults.average) return;
 
@@ -49,14 +59,14 @@ const Calculator = () => {
       await db.collection("calculations").add({
         average: currentResults.average,
         totalCoef: currentResults.totalCoef,
-        subjects: currentResults.subjects, // Stores subject-wise averages
-        grades: grades, // Stores raw input grades
+        subjects: currentResults.subjects,
+        grades: grades,
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
       });
-      alert("Moyenne enregistrée avec succès !");
+      console.log("Auto-save successful");
     } catch (error) {
-      console.error("Erreur lors de l'enregistrement", error);
-      alert("Erreur lors de l'enregistrement: " + error.message);
+      console.error("Auto-save error", error);
+      // Removed alert to avoid interrupting user
     }
   };
 
@@ -399,18 +409,15 @@ const Calculator = () => {
                 </p>
               </div>
               <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => saveToFirebase(results)}
-                  className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-md transition-colors text-sm font-medium backdrop-blur-sm"
-                >
-                  Enregistrer ma moyenne
-                </button>
+                <span className="text-xs text-indigo-200 italic">
+                  Sauvegarde automatique...
+                </span>
               </div>
             </div>
           )}
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 
