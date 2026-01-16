@@ -42,6 +42,146 @@ const Calculator = () => {
   const [results, setResults] = useState({});
   const [targetAverage, setTargetAverage] = useState('');
 
+  const subjects = [
+    {
+      key: 'asd3',
+      name: 'Algorithmique et structure de données 3',
+      coef: 4,
+      hasTD: true,
+      hasTP: true,
+      ue: 'UEF 3.1'
+    },
+    {
+      key: 'poo1',
+      name: 'Programmation orientée objet 1',
+      coef: 4,
+      hasTD: false,
+      hasTP: true,
+      ue: 'UEF 3.1'
+    },
+    {
+      key: 'si',
+      name: "Introduction aux Systèmes d'information",
+      coef: 3,
+      hasTD: true,
+      hasTP: false,
+      ue: 'UEF 3.1'
+    },
+    {
+      key: 'alg3',
+      name: 'Algèbre 3',
+      coef: 3,
+      hasTD: true,
+      hasTP: false,
+      ue: 'UEF 3.2'
+    },
+    {
+      key: 'am3',
+      name: 'Analyse mathématique 3',
+      coef: 3,
+      hasTD: true,
+      hasTP: false,
+      ue: 'UEF 3.2'
+    },
+    {
+      key: 'prob2',
+      name: 'Probabilités et statistiques 2',
+      coef: 2,
+      hasTD: true,
+      hasTP: false,
+      ue: 'UEM 3.1'
+    },
+    {
+      key: 'entrep',
+      name: 'Entreprenariat',
+      coef: 1,
+      hasTD: false,
+      hasTP: false,
+      ue: 'UET 3.1'
+    }
+  ];
+
+  const calculateRequiredGrades = () => {
+    if (!targetAverage || isNaN(targetAverage)) return;
+    const target = parseFloat(targetAverage);
+    let totalCoef = 0;
+    let currentWeightedSum = 0;
+    let coefOfX = 0;
+
+    subjects.forEach(subject => {
+      totalCoef += subject.coef;
+
+      const grade = grades[subject.key];
+      const tdVal = parseFloat(grade.td);
+      const tpVal = parseFloat(grade.tp);
+      const examenVal = parseFloat(grade.examen);
+
+      const isTdFilled = !isNaN(tdVal);
+      const isTpFilled = !isNaN(tpVal);
+      const isExamenFilled = !isNaN(examenVal);
+
+      let count = 0;
+      if (subject.hasTD) count++;
+      if (subject.hasTP) count++;
+
+      let continuPart = 0;
+      let continuXCoef = 0;
+
+      if (count > 0) {
+        if (subject.hasTD) {
+          if (isTdFilled) continuPart += tdVal;
+          else continuXCoef += 1;
+        }
+        if (subject.hasTP) {
+          if (isTpFilled) continuPart += tpVal;
+          else continuXCoef += 1;
+        }
+        continuPart /= count;
+        continuXCoef /= count;
+      }
+
+      let subjectConstant = 0;
+      let subjectXCoef = 0;
+
+      if (subject.hasTD || subject.hasTP) {
+        subjectConstant = 0.4 * continuPart;
+        subjectXCoef = 0.4 * continuXCoef;
+
+        if (isExamenFilled) {
+          subjectConstant += 0.6 * examenVal;
+        } else {
+          subjectXCoef += 0.6;
+        }
+      } else {
+        if (isExamenFilled) {
+          subjectConstant = examenVal;
+        } else {
+          subjectXCoef = 1;
+        }
+      }
+
+      currentWeightedSum += subjectConstant * subject.coef;
+      coefOfX += subjectXCoef * subject.coef;
+    });
+
+    if (coefOfX === 0) {
+      alert("Tous les champs sont déjà remplis ou aucun champ n'est modifiable !");
+      return;
+    }
+
+    let requiredX = (target * totalCoef - currentWeightedSum) / coefOfX;
+    requiredX = parseFloat(requiredX.toFixed(2));
+
+    const newGrades = JSON.parse(JSON.stringify(grades));
+    subjects.forEach(subject => {
+      const gradeKey = subject.key;
+      if (subject.hasTD && newGrades[gradeKey].td === '') newGrades[gradeKey].td = requiredX;
+      if (subject.hasTP && newGrades[gradeKey].tp === '') newGrades[gradeKey].tp = requiredX;
+      if (newGrades[gradeKey].examen === '') newGrades[gradeKey].examen = requiredX;
+    });
+    setGrades(newGrades);
+  };
+
   // No Auto-save or Auto-calculate effects
 
   // Function to perform calculation and return result object
