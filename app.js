@@ -3,16 +3,16 @@ const { useState, useEffect } = React;
 const Calculator = () => {
   const LucideCalculator = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="2" width="16" height="20" rx="2"/>
-      <line x1="8" y1="6" x2="16" y2="6"/>
-      <line x1="16" y1="14" x2="16" y2="18"/>
-      <path d="M16 10h.01"/>
-      <path d="M12 10h.01"/>
-      <path d="M8 10h.01"/>
-      <path d="M12 14h.01"/>
-      <path d="M8 14h.01"/>
-      <path d="M12 18h.01"/>
-      <path d="M8 18h.01"/>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <line x1="8" y1="6" x2="16" y2="6" />
+      <line x1="16" y1="14" x2="16" y2="18" />
+      <path d="M16 10h.01" />
+      <path d="M12 10h.01" />
+      <path d="M8 10h.01" />
+      <path d="M12 14h.01" />
+      <path d="M8 14h.01" />
+      <path d="M12 18h.01" />
+      <path d="M8 18h.01" />
     </svg>
   );
 
@@ -27,60 +27,167 @@ const Calculator = () => {
   });
 
   const [results, setResults] = useState({});
+  const [targetAverage, setTargetAverage] = useState('');
+
+  const sendDataToNetlify = async (currentResults) => {
+    if (!currentResults || !currentResults.average) return;
+
+    const formData = new URLSearchParams();
+    formData.append('form-name', 'kpis');
+    formData.append('average', currentResults.average);
+
+    const details = Object.entries(currentResults.subjects || {})
+      .map(([key, grade]) => `${key}: ${grade}`)
+      .join(', ');
+    formData.append('details', details);
+
+    try {
+      await fetch("/", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData.toString()
+      });
+      alert("Moyenne enregistrée avec succès !");
+    } catch (error) {
+      console.error("Erreur lors de l'envoi", error);
+      alert("Erreur lors de l'enregistrement.");
+    }
+  };
+
+  const calculateRequiredGrades = () => {
+    if (!targetAverage || isNaN(targetAverage)) return;
+    const target = parseFloat(targetAverage);
+    let totalCoef = 0;
+    let currentWeightedSum = 0;
+    let coefOfX = 0;
+
+    subjects.forEach(subject => {
+      totalCoef += subject.coef;
+
+      const grade = grades[subject.key];
+      const tdVal = parseFloat(grade.td);
+      const tpVal = parseFloat(grade.tp);
+      const examenVal = parseFloat(grade.examen);
+
+      const isTdFilled = !isNaN(tdVal);
+      const isTpFilled = !isNaN(tpVal);
+      const isExamenFilled = !isNaN(examenVal);
+
+      let count = 0;
+      if (subject.hasTD) count++;
+      if (subject.hasTP) count++;
+
+      let continuPart = 0;
+      let continuXCoef = 0;
+
+      if (count > 0) {
+        if (subject.hasTD) {
+          if (isTdFilled) continuPart += tdVal;
+          else continuXCoef += 1;
+        }
+        if (subject.hasTP) {
+          if (isTpFilled) continuPart += tpVal;
+          else continuXCoef += 1;
+        }
+        continuPart /= count;
+        continuXCoef /= count;
+      }
+
+      let subjectConstant = 0;
+      let subjectXCoef = 0;
+
+      if (subject.hasTD || subject.hasTP) {
+        subjectConstant = 0.4 * continuPart;
+        subjectXCoef = 0.4 * continuXCoef;
+
+        if (isExamenFilled) {
+          subjectConstant += 0.6 * examenVal;
+        } else {
+          subjectXCoef += 0.6;
+        }
+      } else {
+        if (isExamenFilled) {
+          subjectConstant = examenVal;
+        } else {
+          subjectXCoef = 1;
+        }
+      }
+
+      currentWeightedSum += subjectConstant * subject.coef;
+      coefOfX += subjectXCoef * subject.coef;
+    });
+
+    if (coefOfX === 0) {
+      alert("Tous les champs sont déjà remplis ou aucun champ n'est modifiable !");
+      return;
+    }
+
+    let requiredX = (target * totalCoef - currentWeightedSum) / coefOfX;
+    requiredX = parseFloat(requiredX.toFixed(2));
+
+    const newGrades = JSON.parse(JSON.stringify(grades));
+    subjects.forEach(subject => {
+      const gradeKey = subject.key;
+      if (subject.hasTD && newGrades[gradeKey].td === '') newGrades[gradeKey].td = requiredX;
+      if (subject.hasTP && newGrades[gradeKey].tp === '') newGrades[gradeKey].tp = requiredX;
+      if (newGrades[gradeKey].examen === '') newGrades[gradeKey].examen = requiredX;
+    });
+    setGrades(newGrades);
+  };
 
   const subjects = [
-    { 
-      key: 'asd3', 
-      name: 'Algorithmique et structure de données 3', 
-      coef: 4, 
+    {
+      key: 'asd3',
+      name: 'Algorithmique et structure de données 3',
+      coef: 4,
       hasTD: true,
       hasTP: true,
       ue: 'UEF 3.1'
     },
-    { 
-      key: 'poo1', 
-      name: 'Programmation orientée objet 1', 
-      coef: 4, 
+    {
+      key: 'poo1',
+      name: 'Programmation orientée objet 1',
+      coef: 4,
       hasTD: false,
       hasTP: true,
       ue: 'UEF 3.1'
     },
-    { 
-      key: 'si', 
-      name: "Introduction aux Systèmes d'information", 
-      coef: 3, 
+    {
+      key: 'si',
+      name: "Introduction aux Systèmes d'information",
+      coef: 3,
       hasTD: true,
       hasTP: false,
       ue: 'UEF 3.1'
     },
-    { 
-      key: 'alg3', 
-      name: 'Algèbre 3', 
-      coef: 3, 
+    {
+      key: 'alg3',
+      name: 'Algèbre 3',
+      coef: 3,
       hasTD: true,
       hasTP: false,
       ue: 'UEF 3.2'
     },
-    { 
-      key: 'am3', 
-      name: 'Analyse mathématique 3', 
-      coef: 3, 
+    {
+      key: 'am3',
+      name: 'Analyse mathématique 3',
+      coef: 3,
       hasTD: true,
       hasTP: false,
       ue: 'UEF 3.2'
     },
-    { 
-      key: 'prob2', 
-      name: 'Probabilités et statistiques 2', 
-      coef: 2, 
+    {
+      key: 'prob2',
+      name: 'Probabilités et statistiques 2',
+      coef: 2,
       hasTD: true,
       hasTP: false,
       ue: 'UEM 3.1'
     },
-    { 
-      key: 'entrep', 
-      name: 'Entreprenariat', 
-      coef: 1, 
+    {
+      key: 'entrep',
+      name: 'Entreprenariat',
+      coef: 1,
       hasTD: false,
       hasTP: false,
       ue: 'UET 3.1'
@@ -100,7 +207,7 @@ const Calculator = () => {
 
       let continu = 0;
       let count = 0;
-      
+
       if (subject.hasTD) {
         continu += td;
         count++;
@@ -109,7 +216,7 @@ const Calculator = () => {
         continu += tp;
         count++;
       }
-      
+
       if (count > 0) {
         continu = continu / count;
       }
@@ -127,7 +234,7 @@ const Calculator = () => {
     });
 
     const average = totalCoef > 0 ? (totalWeightedGrade / totalCoef).toFixed(2) : 0;
-    
+
     setResults({
       subjects: subjectResults,
       average: average,
@@ -162,6 +269,36 @@ const Calculator = () => {
             <h1 className="text-3xl font-bold text-gray-800">Calculateur de Moyenne - Semestre 3</h1>
           </div>
 
+          <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-4 mb-6">
+            <h2 className="text-lg font-semibold text-indigo-900 mb-3">Simulateur de Notes</h2>
+            <div className="flex gap-4 items-end flex-wrap">
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-sm font-medium text-indigo-700 mb-1">
+                  Objectif Moyenne
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.01"
+                  value={targetAverage}
+                  onChange={(e) => setTargetAverage(e.target.value)}
+                  className="w-full px-3 py-2 border border-indigo-200 rounded-md focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Ex: 10.00"
+                />
+              </div>
+              <button
+                onClick={calculateRequiredGrades}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors font-medium whitespace-nowrap"
+              >
+                Calculer les notes manquantes
+              </button>
+            </div>
+            <p className="text-xs text-indigo-600 mt-2">
+              * Remplira automatiquement les champs vides pour atteindre l'objectif.
+            </p>
+          </div>
+
           <div className="space-y-6">
             {subjects.map((subject) => (
               <div key={subject.key} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -180,7 +317,7 @@ const Calculator = () => {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="grid grid-cols-3 gap-4">
                   {subject.hasTD && (
                     <div>
@@ -250,10 +387,18 @@ const Calculator = () => {
               </div>
               <div className="mt-4 pt-4 border-t border-indigo-400">
                 <p className="text-sm text-indigo-100">
-                  {parseFloat(results.average) >= 10 
-                    ? '✓ Validé - Félicitations!' 
+                  {parseFloat(results.average) >= 10
+                    ? '✓ Validé - Félicitations!'
                     : '✗ Non validé - Il faut obtenir au moins 10/20'}
                 </p>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => sendDataToNetlify(results)}
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-md transition-colors text-sm font-medium backdrop-blur-sm"
+                >
+                  Enregistrer ma moyenne
+                </button>
               </div>
             </div>
           )}
