@@ -1,5 +1,18 @@
 const { useState, useEffect } = React;
 
+const firebaseConfig = {
+  apiKey: "AIzaSyDQAmcdw5zNSyIbJ8wZUgr1A8VpK8A-7bM",
+  authDomain: "moyennecalculator.firebaseapp.com",
+  projectId: "moyennecalculator",
+  storageBucket: "moyennecalculator.firebasestorage.app",
+  messagingSenderId: "685344175627",
+  appId: "1:685344175627:web:e37b0902f899838324390e"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 const Calculator = () => {
   const LucideCalculator = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -29,28 +42,21 @@ const Calculator = () => {
   const [results, setResults] = useState({});
   const [targetAverage, setTargetAverage] = useState('');
 
-  const sendDataToNetlify = async (currentResults) => {
+  const saveToFirebase = async (currentResults) => {
     if (!currentResults || !currentResults.average) return;
 
-    const formData = new URLSearchParams();
-    formData.append('form-name', 'kpis');
-    formData.append('average', currentResults.average);
-
-    const details = Object.entries(currentResults.subjects || {})
-      .map(([key, grade]) => `${key}: ${grade}`)
-      .join(', ');
-    formData.append('details', details);
-
     try {
-      await fetch("/", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData.toString()
+      await db.collection("calculations").add({
+        average: currentResults.average,
+        totalCoef: currentResults.totalCoef,
+        subjects: currentResults.subjects, // Stores subject-wise averages
+        grades: grades, // Stores raw input grades
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
       });
       alert("Moyenne enregistrée avec succès !");
     } catch (error) {
-      console.error("Erreur lors de l'envoi", error);
-      alert("Erreur lors de l'enregistrement.");
+      console.error("Erreur lors de l'enregistrement", error);
+      alert("Erreur lors de l'enregistrement: " + error.message);
     }
   };
 
@@ -394,7 +400,7 @@ const Calculator = () => {
               </div>
               <div className="mt-6 flex justify-end">
                 <button
-                  onClick={() => sendDataToNetlify(results)}
+                  onClick={() => saveToFirebase(results)}
                   className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-md transition-colors text-sm font-medium backdrop-blur-sm"
                 >
                   Enregistrer ma moyenne
