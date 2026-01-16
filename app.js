@@ -192,6 +192,12 @@ const Calculator = () => {
 
     subjects.forEach(subject => {
       const grade = grades[subject.key];
+      // Defensive check
+      if (!grade) {
+        console.error(`Missing grades for subject: ${subject.key}`);
+        return;
+      }
+
       const td = parseFloat(grade.td) || 0;
       const tp = parseFloat(grade.tp) || 0;
       const examen = parseFloat(grade.examen) || 0;
@@ -233,10 +239,35 @@ const Calculator = () => {
     };
   };
 
+  const saveToFirebase = async (currentResults) => {
+    if (!currentResults || !currentResults.average) return;
+    try {
+      await db.collection("calculations").add({
+        average: currentResults.average,
+        totalCoef: currentResults.totalCoef,
+        subjects: currentResults.subjects,
+        grades: grades,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      console.log("Manual save successful");
+      alert("Moyenne calculée et enregistrée avec succès !");
+    } catch (error) {
+      console.error("Save error", error);
+      alert(`Erreur lors de la sauvegarde: ${error.message} \nVérifiez vos règles Firebase.`);
+    }
+  };
+
   const handleManualCalculate = () => {
-    const newResults = getCalculatedResults();
-    setResults(newResults);
-    saveToFirebase(newResults);
+    try {
+      console.log("Starting calculation...");
+      const newResults = getCalculatedResults();
+      console.log("Calculation result:", newResults);
+      setResults(newResults);
+      saveToFirebase(newResults);
+    } catch (error) {
+      console.error("Calculation error", error);
+      alert(`Erreur de calcul: ${error.message}`);
+    }
   };
 
   const handleInputChange = (subject, type, value) => {
