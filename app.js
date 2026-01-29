@@ -13,6 +13,18 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
+const FunnyModal = ({ onClose }) => (
+  <div onClick={onClose} className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 animate-fade-in">
+    <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all scale-100">
+      <div className="text-center">
+        <p className="text-gray-600 text-lg">
+          Loukan chaque calculations s 10 da ilaq njem3ed azall adnagh sujet algo 🤣😀
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
 const Calculator = () => {
   const LucideCalculator = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -41,6 +53,7 @@ const Calculator = () => {
 
   const [results, setResults] = useState({});
   const [targetAverage, setTargetAverage] = useState('');
+  const [showFunnyModal, setShowFunnyModal] = useState(false);
 
   const subjects = [
     {
@@ -263,6 +276,7 @@ const Calculator = () => {
       const newResults = getCalculatedResults();
       console.log("Calculation result:", newResults);
       setResults(newResults);
+      setShowFunnyModal(true);
       saveToFirebase(newResults);
     } catch (error) {
       console.error("Calculation error", error);
@@ -429,6 +443,7 @@ const Calculator = () => {
           )}
         </div>
       </div>
+      {showFunnyModal && <FunnyModal onClose={() => setShowFunnyModal(false)} />}
     </div>
   );
 };
